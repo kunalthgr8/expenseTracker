@@ -2,18 +2,48 @@ import express from "express";
 import http from "http";
 import cors from "cors";
 import dotenv from "dotenv";
-
+import passport from "passport";
+import session from "express-session";
+import ConnectMongoDBSession from "connect-mongodb-session";
+// import connectMongo from "connect-mongo";
 import { ApolloServer } from "@apollo/server";
 import { expressMiddleware } from "@apollo/server/express4";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 
+import { buildContext } from "graphql-passport";
 import mergedResolvers from "./resolvers/index.js";
 import mergedTypeDefs from "./typeDefs/index.js";
 import connectDb from "./db/connectDb.js";
+import { configurePassport } from "./passport/passport.config.js";
 
 dotenv.config();
+configurePassport();
 const app = express();
 const httpServer = http.createServer(app);
+
+const MongoDBStore = ConnectMongoDBSession(session);
+
+const store = new MongoDBStore({
+  uri: process.env.MONGO_URI,
+  collection: "sessions",
+});
+
+store.on("error", (error) => console.log(error));
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7,
+      httpOnly: true, // helps to prevent cross site scripting attacks
+    },
+    store: store,
+  })
+);
+
+app.use(passport.initialize());
+app.use(passport.session());
 
 const server = new ApolloServer({
   typeDefs: mergedTypeDefs,
@@ -23,16 +53,15 @@ const server = new ApolloServer({
 
 await server.start();
 
-// Set up our Express middleware to handle CORS, body parsing,
-// and our expressMiddleware function.
 app.use(
   "/",
-  cors(),
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }),
   express.json(),
-  // expressMiddleware accepts the same arguments:
-  // an Apollo Server instance and optional configuration options
   expressMiddleware(server, {
-    context: async ({ req }) => ({ req }),
+    context: async ({ req, res }) => buildContext({ req, res }),
   })
 );
 
@@ -40,15 +69,3 @@ app.use(
 await new Promise((resolve) => httpServer.listen({ port: 4000 }, resolve));
 await connectDb();
 console.log(`🚀 Server ready at http://localhost:4000 `);
-
-// // Required logic for integrating with Express
-//
-// // Our httpServer handles incoming requests to our Express app.
-// // Below, we tell Apollo Server to "drain" this httpServer,
-// // enabling our servers to shut down gracefully.
-
-// // Same ApolloServer initialization as before, plus the drain plugin
-// // for our httpServer.
-
-// // Ensure we wait for our server to start
-//
