@@ -2,6 +2,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import RadioButton from "../components/RadioButton";
 import InputField from "../components/InputField";
+import { useMutation } from "@apollo/client";
+import { SIGN_UP } from "../graphql/mutations/user.mutation";
+import toast from "react-hot-toast";
 
 const SignUpPage = () => {
   const [signUpData, setSignUpData] = useState({
@@ -10,6 +13,25 @@ const SignUpPage = () => {
     password: "",
     gender: "",
   });
+
+  const [signup, { loading, error }] = useMutation(SIGN_UP);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await signup({
+        variables: {
+          input: signUpData,
+        },
+      });
+      toast.success("Sign up successful!");
+      // Optionally, redirect to another page after successful signup
+      // history.push("/dashboard");
+    } catch (error) {
+      console.error("Sign up error:", error);
+      toast.error(error.message);
+    }
+  };
 
   const handleChange = (e) => {
     const { name, value, type } = e.target;
@@ -25,11 +47,6 @@ const SignUpPage = () => {
         [name]: value,
       }));
     }
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    console.log(signUpData);
   };
 
   return (
@@ -50,6 +67,7 @@ const SignUpPage = () => {
                 name="name"
                 value={signUpData.name}
                 onChange={handleChange}
+                required
               />
               <InputField
                 label="Username"
@@ -57,6 +75,7 @@ const SignUpPage = () => {
                 name="username"
                 value={signUpData.username}
                 onChange={handleChange}
+                required
               />
 
               <InputField
@@ -66,6 +85,7 @@ const SignUpPage = () => {
                 type="password"
                 value={signUpData.password}
                 onChange={handleChange}
+                required
               />
               <div className="flex gap-10">
                 <RadioButton
@@ -75,6 +95,7 @@ const SignUpPage = () => {
                   value="male"
                   onChange={handleChange}
                   checked={signUpData.gender === "male"}
+                  required
                 />
                 <RadioButton
                   id="female"
@@ -83,18 +104,25 @@ const SignUpPage = () => {
                   value="female"
                   onChange={handleChange}
                   checked={signUpData.gender === "female"}
+                  required
                 />
               </div>
 
               <div>
                 <button
                   type="submit"
-                  className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black  focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-black text-white p-2 rounded-md hover:bg-gray-800 focus:outline-none focus:bg-black focus:ring-2 focus:ring-offset-2 focus:ring-gray-900 transition-colors duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={loading}
                 >
-                  Sign Up
+                  {loading ? "Loading..." : "Sign Up"}
                 </button>
               </div>
             </form>
+            {error && (
+              <div className="mt-4 text-sm text-red-600 text-center">
+                <p>{error.message}</p>
+              </div>
+            )}
             <div className="mt-4 text-sm text-gray-600 text-center">
               <p>
                 Already have an account?{" "}
